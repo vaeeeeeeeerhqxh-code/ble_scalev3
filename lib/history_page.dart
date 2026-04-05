@@ -12,7 +12,7 @@ class HistoryPage extends StatefulWidget {
     super.key,
     this.metricKey = 'weight',
     this.metricLabel = 'Вес',
-    this.metricUnit = 'kg',
+    this.metricUnit = 'кг',
     this.metricColor = const Color(0xFF4C6EF5),
   });
 
@@ -27,14 +27,15 @@ class _HistoryPageState extends State<HistoryPage> {
   String _selectedMetricUnit = '';
   Color _selectedMetricColor = const Color(0xFF4C6EF5);
 
-  final List<Map<String, dynamic>> _metrics = [
-    {'key': 'weight', 'label': 'Вес', 'unit': 'kg', 'color': const Color(0xFF4C6EF5)},
-    {'key': 'bodyFat', 'label': 'Телесный жир', 'unit': '%', 'color': const Color(0xFFFF6B6B)},
-    {'key': 'muscle', 'label': 'Мышцы', 'unit': '%', 'color': const Color(0xFF51CF66)},
-    {'key': 'water', 'label': 'Вода', 'unit': '%', 'color': const Color(0xFF339AF0)},
-    {'key': 'bmi', 'label': 'ИМТ', 'unit': '', 'color': const Color(0xFFCC5DE8)},
-    {'key': 'bmr', 'label': 'БМР', 'unit': 'ккал', 'color': const Color(0xFFFF922B)},
-    {'key': 'bodyHealth', 'label': 'Оценка здоровья', 'unit': '', 'color': const Color(0xFFFF6B6B)},
+  final List<Map<String, dynamic>> _allMetrics = [
+    {'key': 'weight',      'label': 'Вес',              'unit': 'кг',   'color': const Color(0xFF4C6EF5)},
+    {'key': 'bodyFat',     'label': 'Телесный жир',     'unit': '%',    'color': const Color(0xFFFF6B6B)},
+    {'key': 'muscle',      'label': 'Мышцы',            'unit': '%',    'color': const Color(0xFF51CF66)},
+    {'key': 'water',       'label': 'Вода',             'unit': '%',    'color': const Color(0xFF339AF0)},
+    {'key': 'bmi',         'label': 'ИМТ',              'unit': '',     'color': const Color(0xFFCC5DE8)},
+    {'key': 'bmr',         'label': 'БМР',              'unit': 'ккал', 'color': const Color(0xFFFF922B)},
+    {'key': 'bodyHealth',  'label': 'Оценка здоровья',  'unit': '',     'color': const Color(0xFFEC407A)},
+    {'key': 'boneMass',    'label': 'Кости',            'unit': 'кг',   'color': const Color(0xFF90A4AE)},
   ];
 
   @override
@@ -46,36 +47,44 @@ class _HistoryPageState extends State<HistoryPage> {
     _selectedMetricColor = widget.metricColor;
   }
 
-  List<MeasurementRecord> get _filteredRecords =>
+  List<MeasurementRecord> get _records =>
       AppState.instance.recordsFor(_selectedDays);
 
-  List<FlSpot> get _spots {
-    final records = _filteredRecords;
-    if (records.isEmpty) return [];
-    return records.asMap().entries.map((e) {
-      double val = 0;
-      switch (_selectedMetricKey) {
-        case 'weight': val = e.value.weight; break;
-        case 'bodyFat': val = e.value.bodyFat; break;
-        case 'muscle': val = e.value.muscle; break;
-        case 'water': val = e.value.water; break;
-        case 'bmi': val = e.value.bmi; break;
-        case 'bmr': val = e.value.bmr; break;
-        case 'bodyHealth': val = e.value.bodyHealth; break;
-      }
-      return FlSpot(e.key.toDouble(), val);
-    }).toList();
+  double _getVal(MeasurementRecord r, String key) {
+    switch (key) {
+      case 'weight':      return r.weight;
+      case 'bodyFat':     return r.bodyFat;
+      case 'muscle':      return r.muscle;
+      case 'water':       return r.water;
+      case 'bmi':         return r.bmi;
+      case 'bmr':         return r.bmr;
+      case 'boneMass':    return r.boneMass;
+      case 'visceralFat': return r.visceralFat;
+      case 'protein':     return r.protein;
+      case 'bodyAge':     return r.bodyAge;
+      case 'bodyHealth':  return r.bodyHealth;
+      case 'm_la':        return r.mLa;
+      case 'm_ra':        return r.mRa;
+      case 'm_ll':        return r.mLl;
+      case 'm_rl':        return r.mRl;
+      case 'm_tr':        return r.mTr;
+      default:            return 0;
+    }
   }
 
-  double get _minY {
-    if (_spots.isEmpty) return 0;
-    return (_spots.map((s) => s.y).reduce((a, b) => a < b ? a : b) * 0.95);
-  }
+  List<double> get _values =>
+      _records.map((r) => _getVal(r, _selectedMetricKey)).toList();
 
-  double get _maxY {
-    if (_spots.isEmpty) return 100;
-    return (_spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.05);
-  }
+  double get _minVal => _values.isEmpty ? 0 : _values.reduce((a, b) => a < b ? a : b);
+  double get _maxVal => _values.isEmpty ? 0 : _values.reduce((a, b) => a > b ? a : b);
+
+  String _fmt(double v, {int d = 1}) => v == 0 ? '--' : v.toStringAsFixed(d);
+  String _fmtDate(DateTime d) =>
+      '${d.month}-${d.day.toString().padLeft(2, '0')}';
+  String _fmtDateFull(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String _fmtTime(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   String _statusFor(String key, double val) {
     switch (key) {
@@ -96,381 +105,15 @@ class _HistoryPageState extends State<HistoryPage> {
         if (val > 1600) return 'Высокий';
         if (val > 1200) return 'Норма';
         return 'Низкий';
-      default:
-        return 'Норма';
+      default: return 'Норма';
     }
   }
 
   Color _statusColor(String key, double val) {
     final s = _statusFor(key, val);
     if (s == 'Норма' || s == 'Высокий') return Colors.green;
-    if (s == 'Слегка повышенный') return Colors.orange;
+    if (s == 'Избыток') return Colors.orange;
     return Colors.redAccent;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final records = _filteredRecords;
-    final spots = _spots;
-    final latest = AppState.instance.latest;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1B3E),
-      appBar: AppBar(
-        title: const Text('Графики данных',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF0D1B3E),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A2F6B), Color(0xFF0D1B3E), Color(0xFF0A0A1A)],
-          ),
-        ),
-        child: ListenableBuilder(
-          listenable: AppState.instance,
-          builder: (context, _) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Карточка с графиком
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A2340),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Переключатель периода
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              _periodBtn('Стат.', 90),
-                              _periodBtn('День', 1),
-                              _periodBtn('7 дней', 7),
-                              _periodBtn('30 дней', 30),
-                              _periodBtn('90 дней', 90),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Выбор показателя
-                        GestureDetector(
-                          onTap: _showMetricPicker,
-                          child: Row(
-                            children: [
-                              Text(_selectedMetricLabel,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.arrow_drop_down,
-                                  color: Colors.white54),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 4),
-
-                        // Дата диапазон
-                        if (records.isNotEmpty)
-                          Text(
-                            '${_fmt(records.first.date)} ~ ${_fmt(records.last.date)}',
-                            style: const TextStyle(
-                                color: Colors.white38, fontSize: 12),
-                          ),
-
-                        const SizedBox(height: 12),
-
-                        // Мин/Макс
-                        if (spots.isNotEmpty) ...[
-                          Row(
-                            children: [
-                              _statBox(
-                                  'Высокий: $_selectedMetricLabel',
-                                  '${_maxY.toStringAsFixed(1)} $_selectedMetricUnit'),
-                              const SizedBox(width: 24),
-                              _statBox(
-                                  'Низкий: $_selectedMetricLabel',
-                                  '${_minY.toStringAsFixed(1)} $_selectedMetricUnit'),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // График
-                        SizedBox(
-                          height: 200,
-                          child: spots.isEmpty
-                              ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.bar_chart,
-                                    size: 48,
-                                    color: Colors.white.withOpacity(0.15)),
-                                const SizedBox(height: 8),
-                                const Text('Нет данных',
-                                    style: TextStyle(
-                                        color: Colors.white38,
-                                        fontSize: 14)),
-                              ],
-                            ),
-                          )
-                              : LineChart(
-                            LineChartData(
-                              minY: _minY,
-                              maxY: _maxY,
-                              gridData: FlGridData(
-                                show: true,
-                                drawVerticalLine: false,
-                                getDrawingHorizontalLine: (_) => FlLine(
-                                  color: Colors.white.withOpacity(0.05),
-                                  strokeWidth: 1,
-                                ),
-                              ),
-                              borderData: FlBorderData(show: false),
-                              titlesData: FlTitlesData(
-                                leftTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    reservedSize: 40,
-                                    getTitlesWidget: (val, _) => Text(
-                                      val.toStringAsFixed(0),
-                                      style: const TextStyle(
-                                          color: Colors.white38,
-                                          fontSize: 10),
-                                    ),
-                                  ),
-                                ),
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    getTitlesWidget: (val, _) {
-                                      final idx = val.toInt();
-                                      if (idx < 0 || idx >= records.length) {
-                                        return const SizedBox();
-                                      }
-                                      final d = records[idx].date;
-                                      return Text(
-                                        '${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
-                                        style: const TextStyle(
-                                            color: Colors.white38,
-                                            fontSize: 9),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                rightTitles: const AxisTitles(
-                                    sideTitles:
-                                    SideTitles(showTitles: false)),
-                                topTitles: const AxisTitles(
-                                    sideTitles:
-                                    SideTitles(showTitles: false)),
-                              ),
-                              lineBarsData: [
-                                LineChartBarData(
-                                  spots: spots,
-                                  isCurved: true,
-                                  color: _selectedMetricColor,
-                                  barWidth: 2.5,
-                                  dotData: FlDotData(
-                                    show: true,
-                                    getDotPainter: (_, __, ___, ____) =>
-                                        FlDotCirclePainter(
-                                          radius: 3,
-                                          color: _selectedMetricColor,
-                                          strokeWidth: 1.5,
-                                          strokeColor: Colors.white,
-                                        ),
-                                  ),
-                                  belowBarData: BarAreaData(
-                                    show: true,
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        _selectedMetricColor
-                                            .withOpacity(0.3),
-                                        _selectedMetricColor
-                                            .withOpacity(0.0),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Карточки других показателей
-                  if (latest != null)
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.4,
-                      children: _metrics.map((m) {
-                        double val = 0;
-                        switch (m['key']) {
-                          case 'weight': val = latest.weight; break;
-                          case 'bodyFat': val = latest.bodyFat; break;
-                          case 'muscle': val = latest.muscle; break;
-                          case 'water': val = latest.water; break;
-                          case 'bmi': val = latest.bmi; break;
-                          case 'bmr': val = latest.bmr; break;
-                          case 'bodyHealth': val = latest.bodyHealth; break;
-                        }
-                        final color = m['color'] as Color;
-                        final key = m['key'] as String;
-                        final status = _statusFor(key, val);
-                        final statusColor = _statusColor(key, val);
-
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedMetricKey = key;
-                              _selectedMetricLabel = m['label'] as String;
-                              _selectedMetricUnit = m['unit'] as String;
-                              _selectedMetricColor = color;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1A2340),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _selectedMetricKey == key
-                                    ? color
-                                    : Colors.transparent,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        color: color.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          m['label'].toString().substring(0, 1),
-                                          style: TextStyle(
-                                              color: color,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(m['label'] as String,
-                                          style: const TextStyle(
-                                              color: Colors.white54,
-                                              fontSize: 12),
-                                          overflow: TextOverflow.ellipsis),
-                                    ),
-                                  ],
-                                ),
-                                const Spacer(),
-                                Text(
-                                  val > 0
-                                      ? '${val.toStringAsFixed(1)} ${m['unit']}'
-                                      : '--',
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                Text(status,
-                                    style: TextStyle(
-                                        color: statusColor, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                  const SizedBox(height: 24),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _periodBtn(String label, int days) {
-    final selected = _selectedDays == days;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedDays = days),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFF4C6EF5) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: selected ? Colors.white : Colors.white38,
-                fontSize: 12,
-                fontWeight:
-                selected ? FontWeight.bold : FontWeight.normal),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _statBox(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(value,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold)),
-        Text(label,
-            style: const TextStyle(color: Colors.white38, fontSize: 11)),
-      ],
-    );
   }
 
   void _showMetricPicker() {
@@ -484,29 +127,22 @@ class _HistoryPageState extends State<HistoryPage> {
         children: [
           const SizedBox(height: 12),
           const Text('Выберите показатель',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold)),
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          ..._metrics.map((m) {
+          ..._allMetrics.map((m) {
             final isSelected = m['key'] == _selectedMetricKey;
             return ListTile(
               leading: Container(
-                width: 32,
-                height: 32,
+                width: 32, height: 32,
                 decoration: BoxDecoration(
                   color: (m['color'] as Color).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.show_chart,
-                    color: m['color'] as Color, size: 18),
+                child: Icon(Icons.show_chart, color: m['color'] as Color, size: 18),
               ),
               title: Text(m['label'] as String,
                   style: TextStyle(
-                      color: isSelected
-                          ? const Color(0xFF4C6EF5)
-                          : Colors.white)),
+                      color: isSelected ? const Color(0xFF4C6EF5) : Colors.white)),
               trailing: isSelected
                   ? const Icon(Icons.check, color: Color(0xFF4C6EF5))
                   : null,
@@ -527,6 +163,519 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  String _fmt(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1B3E),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1A2F6B), Color(0xFF0D1B3E), Color(0xFF0A0A1A)],
+          ),
+        ),
+        child: SafeArea(
+          child: ListenableBuilder(
+            listenable: AppState.instance,
+            builder: (context, _) {
+              final records = _records;
+              final values = _values;
+              final hasData = values.isNotEmpty && values.any((v) => v > 0);
+              final latest = records.isNotEmpty ? records.last : null;
+
+              return CustomScrollView(
+                slivers: [
+                  // Заголовок
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 12, 20, 0),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          const Expanded(
+                            child: Text('Графики данных',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(child: const SizedBox(height: 16)),
+
+                  // Основная карточка с графиком
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A2340),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Переключатель периода
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black26,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  _periodBtn('Все', 90),
+                                  _periodBtn('День', 1),
+                                  _periodBtn('7 дней', 7),
+                                  _periodBtn('30 дней', 30),
+                                  _periodBtn('90 дней', 90),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Название показателя с дропдауном
+                            GestureDetector(
+                              onTap: _showMetricPicker,
+                              child: Row(
+                                children: [
+                                  Text(_selectedMetricLabel,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.arrow_drop_down,
+                                      color: Colors.white54),
+                                ],
+                              ),
+                            ),
+
+                            // Диапазон дат
+                            if (records.length >= 2) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_fmtDateFull(records.first.date)} ~ ${_fmtDateFull(records.last.date)}',
+                                style: const TextStyle(
+                                    color: Color(0xFF4C6EF5), fontSize: 12),
+                              ),
+                            ],
+
+                            const SizedBox(height: 16),
+
+                            // Высокий / Низкий
+                            if (hasData)
+                              Row(
+                                children: [
+                                  _highLowBox(
+                                    '${_fmt(_maxVal)} ${_selectedMetricUnit}',
+                                    'Высокий: $_selectedMetricLabel',
+                                  ),
+                                  const SizedBox(width: 32),
+                                  _highLowBox(
+                                    '${_fmt(_minVal)} ${_selectedMetricUnit}',
+                                    'Низкий: $_selectedMetricLabel',
+                                  ),
+                                ],
+                              ),
+
+                            const SizedBox(height: 16),
+
+                            // График
+                            SizedBox(
+                              height: 180,
+                              child: hasData
+                                  ? _buildChart(records, values)
+                                  : _buildEmptyChart(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SliverToBoxAdapter(child: const SizedBox(height: 20)),
+
+                  // Карточки других показателей (как в референсе)
+                  if (AppState.instance.latest != null)
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.6,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                            final m = _allMetrics[index];
+                            final key = m['key'] as String;
+                            final color = m['color'] as Color;
+                            final val = _getVal(AppState.instance.latest!, key);
+                            final status = _statusFor(key, val);
+                            final statusColor = _statusColor(key, val);
+                            final isSelected = key == _selectedMetricKey;
+
+                            return GestureDetector(
+                              onTap: () => setState(() {
+                                _selectedMetricKey = key;
+                                _selectedMetricLabel = m['label'] as String;
+                                _selectedMetricUnit = m['unit'] as String;
+                                _selectedMetricColor = color;
+                              }),
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A2340),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? color.withOpacity(0.6)
+                                        : Colors.transparent,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 28, height: 28,
+                                          decoration: BoxDecoration(
+                                            color: color.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              (m['label'] as String)[0],
+                                              style: TextStyle(
+                                                  color: color,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(m['label'] as String,
+                                              style: const TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 11),
+                                              overflow: TextOverflow.ellipsis),
+                                        ),
+                                      ],
+                                    ),
+                                    const Spacer(),
+                                    RichText(
+                                      text: TextSpan(children: [
+                                        TextSpan(
+                                          text: val > 0
+                                              ? val.toStringAsFixed(1)
+                                              : '--',
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        if ((m['unit'] as String).isNotEmpty)
+                                          TextSpan(
+                                            text: ' ${m['unit']}',
+                                            style: const TextStyle(
+                                                color: Colors.white38,
+                                                fontSize: 11),
+                                          ),
+                                      ]),
+                                    ),
+                                    Text(status,
+                                        style: TextStyle(
+                                            color: statusColor, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          childCount: _allMetrics.length,
+                        ),
+                      ),
+                    ),
+
+                  SliverToBoxAdapter(child: const SizedBox(height: 20)),
+
+                  // Список всех записей
+                  if (records.isNotEmpty) ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                        child: Row(
+                          children: [
+                            const Text('Все записи',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold)),
+                            const Spacer(),
+                            Text('${records.length} шт.',
+                                style: const TextStyle(
+                                    color: Colors.white38, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                          final r = records.reversed.toList()[index];
+                          final val = _getVal(r, _selectedMetricKey);
+                          final isFirst = index == 0;
+
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A2340),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isFirst
+                                      ? _selectedMetricColor.withOpacity(0.4)
+                                      : Colors.transparent,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${_fmtDate(r.date)} ${_fmtTime(r.date)}',
+                                        style: const TextStyle(
+                                            color: Colors.white54, fontSize: 13),
+                                      ),
+                                    ],
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '${_fmt(val)} $_selectedMetricUnit',
+                                    style: TextStyle(
+                                        color: isFirst
+                                            ? _selectedMetricColor
+                                            : Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        childCount: records.length,
+                      ),
+                    ),
+                  ] else
+                    SliverToBoxAdapter(child: _buildEmptyState()),
+
+                  SliverToBoxAdapter(child: const SizedBox(height: 32)),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _periodBtn(String label, int days) {
+    final selected = _selectedDays == days;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedDays = days),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF4C6EF5) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: selected ? Colors.white : Colors.white38,
+                  fontSize: 11,
+                  fontWeight:
+                  selected ? FontWeight.bold : FontWeight.normal)),
+        ),
+      ),
+    );
+  }
+
+  Widget _highLowBox(String value, String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold)),
+        Text(label,
+            style: const TextStyle(color: Colors.white38, fontSize: 11)),
+      ],
+    );
+  }
+
+  Widget _buildChart(List<MeasurementRecord> records, List<double> values) {
+    final spots = values.asMap().entries
+        .map((e) => FlSpot(e.key.toDouble(), e.value))
+        .toList();
+    final pad = (_maxVal - _minVal) * 0.1;
+    final double minY = (_minVal - pad)
+        .clamp(0, double.infinity)
+        .toDouble();
+
+    final double maxY = (_maxVal + pad).toDouble();
+
+    return LineChart(
+      LineChartData(
+        minY: minY, maxY: maxY,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (_) => FlLine(
+              color: Colors.white.withOpacity(0.05), strokeWidth: 1),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 36,
+              getTitlesWidget: (val, _) => Text(
+                val.toStringAsFixed(1),
+                style: const TextStyle(color: Colors.white24, fontSize: 9),
+              ),
+            ),
+          ),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (val, _) {
+                final idx = val.toInt();
+                if (idx != 0 && idx != records.length - 1) return const SizedBox();
+                if (idx < 0 || idx >= records.length) return const SizedBox();
+                return Text(_fmtDate(records[idx].date),
+                    style: const TextStyle(color: Colors.white38, fontSize: 9));
+              },
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => const Color(0xFF0D1B3E),
+            getTooltipItems: (spots) => spots.map((s) {
+              final idx = s.spotIndex;
+              final r = records[idx];
+              return LineTooltipItem(
+                '${_fmt(s.y)} $_selectedMetricUnit\n${_fmtDate(r.date)} ${_fmtTime(r.date)}',
+                TextStyle(
+                    color: _selectedMetricColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12),
+              );
+            }).toList(),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            curveSmoothness: 0.3,
+            color: _selectedMetricColor,
+            barWidth: 2,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                radius: 3,
+                color: _selectedMetricColor,
+                strokeWidth: 1.5,
+                strokeColor: Colors.white,
+              ),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  _selectedMetricColor.withOpacity(0.25),
+                  _selectedMetricColor.withOpacity(0.0),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyChart() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.bar_chart, size: 40, color: Colors.white.withOpacity(0.1)),
+          const SizedBox(height: 8),
+          const Text('Нет данных',
+              style: TextStyle(color: Colors.white24, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFF4C6EF5).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.bar_chart,
+                  size: 32,
+                  color: const Color(0xFF4C6EF5).withOpacity(0.4)),
+            ),
+            const SizedBox(height: 16),
+            const Text('Нет записей',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            const Text(
+              'Подключите весы и проведите\nпервое измерение',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white38, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

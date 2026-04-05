@@ -126,34 +126,62 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
     );
   }
 
-  void _showMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A2340),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  void _showMenu(BuildContext buttonContext) async {
+    final RenderBox button = buttonContext.findRenderObject() as RenderBox;
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
       ),
-      builder: (ctx) => Column(
+      Offset.zero & overlay.size,
+    );
+
+    final result = await showMenu<String>(
+      context: context,
+      position: position,
+      color: const Color(0xFF1E2C4F),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 12,
+      constraints: const BoxConstraints(minWidth: 180, maxWidth: 200),
+      items: [
+        _popupItem('add_device', Icons.bluetooth_searching, 'Добавить устройство'),
+        _popupItem('scan_qr', Icons.qr_code_scanner, 'Отсканировать QR'),
+        _popupItem('manage_device', Icons.devices, 'Управление устройством'),
+        _popupItem('manage_members', Icons.group_outlined, 'Управление участниками'),
+      ],
+    );
+
+    if (result == null) return;
+    switch (result) {
+      case 'add_device':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const BleScanPage()));
+        break;
+      case 'manage_device':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceManagementPage()));
+        break;
+      case 'manage_members':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const MembersPage()));
+        break;
+    }
+  }
+
+  PopupMenuItem<String> _popupItem(String value, IconData icon, String label) {
+    return PopupMenuItem<String>(
+      value: value,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 12),
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 16),
-          _menuItem(Icons.bluetooth_searching, 'Добавить устройство', () {
-            Navigator.pop(ctx);
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const BleScanPage()));
-          }),
-          _menuItem(Icons.qr_code_scanner, 'Отсканировать QR', () => Navigator.pop(ctx)),
-          _menuItem(Icons.devices, 'Управление устройством', () {
-            Navigator.pop(ctx);
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceManagementPage()));
-          }),
-          _menuItem(Icons.group_outlined, 'Управление участниками', () {
-            Navigator.pop(ctx);
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const MembersPage()));
-          }),
-          const SizedBox(height: 24),
+          Icon(icon, color: const Color(0xFF4C6EF5), size: 18),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+              softWrap: true,
+            ),
+          ),
         ],
       ),
     );
@@ -239,14 +267,16 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                 ),
               ),
               const Spacer(),
-              GestureDetector(
-                onTap: _showMenu,
+            Builder(
+              builder: (buttonContext) => GestureDetector(
+                onTap: () => _showMenu(buttonContext),
                 child: Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(color: const Color(0xFF1A2340), borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.dashboard_outlined, color: Colors.white54, size: 22),
                 ),
               ),
+             ),
             ],
           ),
         );
