@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:image_picker/image_picker.dart';
 import 'main_screen.dart';
 import 'profile_manager.dart';
 
@@ -17,6 +19,7 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
   DateTime _birthday = DateTime(2000, 1, 1);
   int _height = 170;
   String _lengthUnit = 'cm';
+  String? _avatarPath;
 
   final List<String> _types = ['Взрослый человек', 'Спортсмен', 'Ребёнок'];
   final List<String> _genders = ['Мужской', 'Женский'];
@@ -36,7 +39,59 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
     if (p != null) {
       _type = p.type; _gender = p.gender;
       _birthday = p.birthday; _height = p.height; _lengthUnit = p.lengthUnit;
+      _avatarPath = p.avatarPath.isEmpty ? null : p.avatarPath;
     }
+  }
+
+  Future<void> _pickAvatar() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A2340),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          const Text('Фото таңдау', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.photo_library, color: Colors.white70),
+            title: const Text('Галереядан', style: TextStyle(color: Colors.white)),
+            onTap: () async {
+              Navigator.pop(ctx);
+              final picked = await ImagePicker().pickImage(
+                source: ImageSource.gallery,
+                imageQuality: 85,
+              );
+              if (picked != null) setState(() => _avatarPath = picked.path);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.camera_alt, color: Colors.white70),
+            title: const Text('Камерадан', style: TextStyle(color: Colors.white)),
+            onTap: () async {
+              Navigator.pop(ctx);
+              final picked = await ImagePicker().pickImage(
+                source: ImageSource.camera,
+                imageQuality: 85,
+              );
+              if (picked != null) setState(() => _avatarPath = picked.path);
+            },
+          ),
+          if (_avatarPath != null)
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('Фотоны жою', style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() => _avatarPath = null);
+              },
+            ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveAndContinue() async {
@@ -44,6 +99,7 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
     if (profile == null) return;
     await ProfileManager.instance.updateProfile(profile.copyWith(
       type: _type, gender: _gender, birthday: _birthday, height: _height,
+      avatarPath: _avatarPath ?? '',
     ));
     if (!mounted) return;
     if (widget.profileId == null) {
@@ -137,7 +193,7 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A2F6B), Color(0xFF0D1B3E), Color(0xFF0A0A1A)]),
+              colors: [Color(0xFF1A2F6B), Color(0xFF0D1B3E), Color(0xFF0A0A1A)]),
         ),
         child: SafeArea(
           child: Column(
@@ -147,16 +203,36 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   children: [
                     const SizedBox(height: 48),
-                    Center(child: Stack(children: [
-                      Container(width: 80, height: 80,
-                        decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF1A2340),
-                          border: Border.all(color: const Color(0xFF4C6EF5), width: 2)),
-                        child: const Icon(Icons.person, color: Colors.white54, size: 40)),
-                      Positioned(bottom: 0, right: 0,
-                        child: Container(width: 24, height: 24,
-                          decoration: const BoxDecoration(color: Color(0xFF4C6EF5), shape: BoxShape.circle),
-                          child: const Icon(Icons.edit, color: Colors.white, size: 14))),
-                    ])),
+                    Center(
+                      child: GestureDetector(
+                        onTap: _pickAvatar,
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 80, height: 80,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF1A2340),
+                                border: Border.all(color: const Color(0xFF4C6EF5), width: 2),
+                              ),
+                              child: ClipOval(
+                                child: _avatarPath != null
+                                    ? Image.file(File(_avatarPath!), fit: BoxFit.cover, width: 80, height: 80)
+                                    : const Icon(Icons.person, color: Colors.white54, size: 40),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0, right: 0,
+                              child: Container(
+                                width: 24, height: 24,
+                                decoration: const BoxDecoration(color: Color(0xFF4C6EF5), shape: BoxShape.circle),
+                                child: const Icon(Icons.edit, color: Colors.white, size: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     Center(child: Text(isEditing ? 'Редактировать информацию' : 'Заполните информацию',
                         style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold))),
