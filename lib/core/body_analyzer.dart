@@ -1,140 +1,232 @@
 import 'dart:math';
-import 'package:flutter/foundation.dart';
+
+class UserProfile {
+  final double height; // cm
+  final int age;
+  final bool isMale;
+
+  UserProfile({
+    required this.height,
+    required this.age,
+    required this.isMale,
+  });
+}
 
 class BodyAnalyzer {
   static Map<String, dynamic> calculate({
     required double weight,
-    required double height,
-    required int age,
-    required bool isMale,
-    required Map<String, dynamic> data,
+    required List<int> impedanceValues,
+    required UserProfile profile,
   }) {
-    if (weight <= 0) return {};
-
-    // ========================
-    // DECODE & NORMALIZE
-    // ========================
-    double decode(String key) {
-      int raw = (data[key] ?? 0).toInt();
-      return raw / 1000000.0;
+    // -----------------------------
+    // ✅ 1. VALIDATION
+    // -----------------------------
+    if (weight <= 0 || weight > 300 || impedanceValues.isEmpty) {
+      print("ERROR: Invalid input");
+      return {};
     }
 
-    double norm(double z) {
-      if (z < 50) return 50;
-      if (z > 1500) return 1500;
-      return z;
+    final height = profile.height;
+    final age = profile.age;
+    final isMale = profile.isMale;
+
+    // -----------------------------
+    // ✅ 2. BMI
+    // -----------------------------
+    final heightM = height / 100.0;
+    final bmi = weight / (heightM * heightM);
+
+    // -----------------------------
+    // ✅ 3. IMPEDANCE PROCESSING
+    // -----------------------------
+    List<double> processed = impedanceValues.map((v) {
+      if (v <= 0) return 0.0;
+      if (v > 10000) return v / 100.0;
+      return v.toDouble();
+    }).where((v) => v > 100 && v < 1200).toList();
+
+    if (processed.isEmpty) {
+      print("ERROR: No valid impedance");
+      return {};
     }
 
-    double la20 = norm(decode("z20KhzLeftArmEnCode"));
-    double ra20 = norm(decode("z20KhzRightArmEnCode"));
-    double ll20 = norm(decode("z20KhzLeftLegEnCode"));
-    double rl20 = norm(decode("z20KhzRightLegEnCode"));
-    double tr20 = norm(decode("z20KhzTrunkEnCode"));
+    final resistance =
+        processed.reduce((a, b) => a + b) / processed.length;
 
-    double la100 = norm(decode("z100KhzLeftArmEnCode"));
-    double ra100 = norm(decode("z100KhzRightArmEnCode"));
-    double ll100 = norm(decode("z100KhzLeftLegEnCode"));
-    double rl100 = norm(decode("z100KhzRightLegEnCode"));
-    double tr100 = norm(decode("z100KhzTrunkEnCode"));
+    // -----------------------------
+    // ✅ 4. IMP INDEX
+    // -----------------------------
+    final impIndex = (height * height) / resistance;
 
-    // ========================
-    // BODY COMPOSITION BASE
-    // ========================
-    double z100Avg = (la100 + ra100 + ll100 + rl100 + tr100) / 5;
-    double tbw = 0.372 * weight + (3.05 * (height * height) / z100Avg) - 0.142 * age + (isMale ? 5.0 : -3.0);
-    tbw = tbw.clamp(weight * 0.45, weight * 0.75);
+    // -----------------------------
+    // ✅ 5. TBW
+    // -----------------------------
+    double tbw;
 
-    double ffm = (tbw / 0.73).clamp(weight * 0.6, weight * 0.95);
-    double fatMass = (weight - ffm).clamp(weight * 0.05, weight * 0.4);
-    double fatPercent = (fatMass / weight) * 100;
-
-    double muscleKg = (ffm * 0.85).clamp(weight * 0.5, weight * 0.9);
-    double musclePercent = (muscleKg / weight) * 100;
-
-    // ========================
-    // WEIGHTED SEGMENT ANALYSIS
-    // ========================
-    // Anatomical weights (approximate muscle distribution)
-    const wArm = 0.18;
-    const wLeg = 0.32;
-    const wTrunk = 0.50;
-
-    // Weighted Admittance (1/Z) calculation
-    double getInv(double z20, double z100, double weight) {
-      double zEff = (0.7 * z20 + 0.3 * z100);
-      return (1 / zEff).clamp(0.0001, 1.0) * weight;
+    if (isMale) {
+      tbw =
+          (0.396 * impIndex) +
+              (0.143 * weight) +
+              (0.067 * age) +
+              0.1;
+    } else {
+      tbw =
+          (0.346 * impIndex) +
+              (0.137 * weight) +
+              (0.054 * age) +
+              0.1;
     }
 
-    double invLA = getInv(la20, la100, wArm);
-    double invRA = getInv(ra20, ra100, wArm);
-    double invLL = getInv(ll20, ll100, wLeg);
-    double invRL = getInv(rl20, rl100, wLeg);
-    double invTR = getInv(tr20, tr100, wTrunk);
+    // -----------------------------
+    // ✅ 6. FFM (ADAPTIVE)
+    // -----------------------------
+    double hydrationBase = isMale ? 0.72 : 0.69;
 
-    double totalInv = invLA + invRA + invLL + invRL + invTR;
+    double rNorm = resistance / (height * 2.2);
 
-    // Distribute Muscle (Weighted)
-    double mLA = muscleKg * (invLA / totalInv);
-    double mRA = muscleKg * (invRA / totalInv);
-    double mLL = muscleKg * (invLL / totalInv);
-    double mRL = muscleKg * (invRL / totalInv);
-    double mTR = muscleKg * (invTR / totalInv);
+    double correction =
+    (1.0 + (rNorm - 1.0) * 0.4).clamp(0.85, 1.15);
 
-    // Sanity Checks for Segment Proportions
-    // 1. Balance check (max 20% difference between limbs)
-    double balance(double left, double right) {
-      if (left == 0 || right == 0) return 1.0;
-      double diff = (left - right).abs() / ((left + right) / 2);
-      if (diff > 0.20) {
-        double avg = (left + right) / 2;
-        return avg; // Return avg if diff is too high
-      }
-      return -1.0; // No adjustment needed
-    }
+    double ffm = tbw / (hydrationBase * correction);
+    ffm = ffm.clamp(weight * 0.5, weight * 0.95);
 
-    double bArm = balance(mLA, mRA);
-    if (bArm != -1.0) { mLA = bArm; mRA = bArm; }
+    // -----------------------------
+    // ✅ 7. FAT
+    // -----------------------------
+    double fatMass = weight - ffm;
 
-    double bLeg = balance(mLL, mRL);
-    if (bLeg != -1.0) { mLL = bLeg; mRL = bLeg; }
+    double bodyFat = fatMass / weight * 100;
 
-    // 2. Trunk Proportion Check (40-60%)
-    double trProp = mTR / muscleKg;
-    if (trProp < 0.40) mTR = muscleKg * 0.40;
-    if (trProp > 0.60) mTR = muscleKg * 0.60;
+    double fatCorrection =
+        ((bmi - 20) * 0.8) +
+            ((resistance - 400) * 0.02);
 
-    // Final Normalize to ensure sum == muscleKg
-    double currentSum = mLA + mRA + mLL + mRL + mTR;
-    double normFactor = muscleKg / currentSum;
-    mLA *= normFactor; mRA *= normFactor; mLL *= normFactor; mRL *= normFactor; mTR *= normFactor;
+    bodyFat = (bodyFat + fatCorrection).clamp(5.0, 35.0);
 
-    // Distribute Fat (proportional to muscle segments as a simplified model)
-    double fFactor = fatMass / muscleKg;
-    double fLA = mLA * fFactor; double fRA = mRA * fFactor;
-    double fLL = mLL * fFactor; double fRL = mRL * fFactor;
-    double fTR = mTR * fFactor;
+    // -----------------------------
+    // ✅ 8. WATER
+    // -----------------------------
+    double water = (tbw / weight * 100).clamp(30.0, 75.0);
 
-    // ========================
-    // FINAL RESULTS
-    // ========================
-    double bmr = (10 * weight) + (6.25 * height) - (5 * age) + (isMale ? 5 : -161);
-    
+    // -----------------------------
+    // ✅ 9. FAT TYPES
+    // -----------------------------
+    double subcutaneousFat =
+    (bodyFat * 0.82).clamp(5.0, 35.0);
+
+    double visceralFat = (
+        (bodyFat * 0.12) +
+            (bmi * 0.18) +
+            (isMale ? 1.5 : 1)
+    ).clamp(1.0, 15.0);
+
+    // -----------------------------
+    // ✅ 10. MUSCLE (REAL)
+    // -----------------------------
+    double skeletalMuscle = ffm * (isMale ? 0.50 : 0.45);
+    double skeletalMusclePercent =
+        skeletalMuscle / weight * 100;
+
+    // -----------------------------
+    // ✅ 11. BODY MUSCLE (как в весах)
+    // -----------------------------
+    double bodyMuscle = ffm;
+    double bodyMusclePercent =
+        (ffm / weight) * 100;
+
+    // -----------------------------
+    // ✅ 12. CLASSIC MUSCLE
+    // -----------------------------
+    double muscleMass = ffm * (isMale ? 0.56 : 0.51);
+    double muscle = muscleMass / weight * 100;
+
+    // -----------------------------
+    // ✅ 13. BONE
+    // -----------------------------
+    double boneMass = (
+        ffm * 0.055 +
+            weight * 0.008
+    ).clamp(2.5, 4.0);
+
+    // -----------------------------
+    // ✅ 14. PROTEIN
+    // -----------------------------
+    double protein =
+    (muscleMass * 0.2 / weight * 100).clamp(8.0, 25.0);
+
+    // -----------------------------
+    // ✅ 15. BMR
+    // -----------------------------
+    double bmr = isMale
+        ? 10 * weight + 6.25 * height - 5 * age + 5
+        : 10 * weight + 6.25 * height - 5 * age - 161;
+
+    // -----------------------------
+    // ✅ 16. LEAN MASS
+    // -----------------------------
+    double leanMassPercent = (ffm / weight) * 100;
+
+    // -----------------------------
+    // ✅ 17. BODY AGE
+    // -----------------------------
+    double normalFat = isMale ? 15.0 : 22.0;
+
+    double bodyAge =
+    (age + (bodyFat - normalFat) * 0.4)
+        .clamp(age - 5, age + 20);
+
+    // -----------------------------
+    // ✅ 18. HEALTH
+    // -----------------------------
+    double idealFat = isMale ? 12.0 : 20.0;
+
+    double bodyHealth =
+    (100 - (bodyFat - idealFat).abs() * 2.5)
+        .clamp(0.0, 100.0);
+
+    // -----------------------------
+    // ✅ 19. SEGMENTS (BASE)
+    // -----------------------------
+    double m = muscleMass;
+
+    double m_la = m * 0.105;
+    double m_ra = m * 0.105;
+    double m_ll = m * 0.19;
+    double m_rl = m * 0.19;
+    double m_tr = m * 0.41;
+
+    // -----------------------------
+    // ✅ RESULT
+    // -----------------------------
     return {
-      "bmi": weight / pow(height / 100, 2),
-      "bodyFat": fatPercent.clamp(5.0, 35.0),
-      "fatMass": fatMass,
-      "muscle": musclePercent.clamp(60.0, 90.0),
-      "muscleKg": muscleKg,
-      "water": (tbw / weight * 100).clamp(50.0, 75.0),
-      "visceralFat": (fatPercent * 0.35).clamp(1.0, 15.0),
-      "protein": (ffm * 0.21 / weight * 100).clamp(10.0, 20.0),
+      "bmi": bmi,
+      "bodyFat": bodyFat,
+      "subcutaneousFat": subcutaneousFat,
+      "visceralFat": visceralFat,
+      "water": water,
+
+      // 🔥 главное
+      "bodyMuscle": bodyMuscle,
+      "bodyMusclePercent": bodyMusclePercent,
+
+      "skeletalMuscle": skeletalMuscle,
+      "skeletalMusclePercent": skeletalMusclePercent,
+
+      "muscle": muscle,
+      "leanMass": leanMassPercent,
+
+      "protein": protein,
+      "boneMass": boneMass,
       "bmr": bmr,
-      "boneMass": weight * 0.045,
-      "m_la": mLA, "m_ra": mRA, "m_ll": mLL, "m_rl": mRL, "m_tr": mTR,
-      "f_la": fLA, "f_ra": fRA, "f_ll": fLL, "f_rl": fRL, "f_tr": fTR,
-      "bodyAge": age + (fatPercent - 15) * 0.5,
-      "bodyHealth": (100 - (fatPercent - 12).abs() * 3).clamp(0, 100),
-      "idealWeight": height - 100,
+
+      "bodyAge": bodyAge,
+      "bodyHealth": bodyHealth,
+
+      "m_la": m_la,
+      "m_ra": m_ra,
+      "m_ll": m_ll,
+      "m_rl": m_rl,
+      "m_tr": m_tr,
     };
   }
 }
