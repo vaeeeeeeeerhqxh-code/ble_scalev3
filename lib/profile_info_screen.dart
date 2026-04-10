@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'main_screen.dart';
 import 'profile_manager.dart';
+import 'app_state.dart';
 
 class ProfileInfoScreen extends StatefulWidget {
   final String? profileId;
@@ -40,6 +41,15 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
   }
 
   Future<void> _saveAndContinue() async {
+    // ← ВСТАВЬ ЭТИ 3 СТРОКИ В НАЧАЛО МЕТОДА:
+    // Сохраняем данные для BIA
+    AppState.instance.lastProfileData = {
+      'height': _height.toDouble(),
+      'age': DateTime.now().year - _birthday.year -
+          ((DateTime.now().month < _birthday.month ||
+              (DateTime.now().month == _birthday.month && DateTime.now().day < _birthday.day)) ? 1 : 0),
+      'isMale': _gender == 'Мужской',
+    };
     final profile = _targetProfile;
     if (profile == null) return;
     await ProfileManager.instance.updateProfile(profile.copyWith(
