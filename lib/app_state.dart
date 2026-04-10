@@ -16,18 +16,6 @@ class MeasurementRecord {
   final double protein;
   final double bodyAge;
   final double bodyHealth;
-  // Сегментарный анализ — мышцы
-  final double mLa;
-  final double mRa;
-  final double mLl;
-  final double mRl;
-  final double mTr;
-  // Сегментарный анализ — жир
-  final double fLa;
-  final double fRa;
-  final double fLl;
-  final double fRl;
-  final double fTr;
 
   MeasurementRecord({
     required this.date,
@@ -42,8 +30,6 @@ class MeasurementRecord {
     required this.protein,
     required this.bodyAge,
     required this.bodyHealth,
-    this.mLa = 0, this.mRa = 0, this.mLl = 0, this.mRl = 0, this.mTr = 0,
-    this.fLa = 0, this.fRa = 0, this.fLl = 0, this.fRl = 0, this.fTr = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -52,8 +38,6 @@ class MeasurementRecord {
     'water': water, 'bmi': bmi, 'bmr': bmr, 'boneMass': boneMass,
     'visceralFat': visceralFat, 'protein': protein,
     'bodyAge': bodyAge, 'bodyHealth': bodyHealth,
-    'm_la': mLa, 'm_ra': mRa, 'm_ll': mLl, 'm_rl': mRl, 'm_tr': mTr,
-    'f_la': fLa, 'f_ra': fRa, 'f_ll': fLl, 'f_rl': fRl, 'f_tr': fTr,
   };
 
   factory MeasurementRecord.fromJson(Map<String, dynamic> j) => MeasurementRecord(
@@ -69,12 +53,6 @@ class MeasurementRecord {
     protein: (j['protein'] ?? 0).toDouble(),
     bodyAge: (j['bodyAge'] ?? 0).toDouble(),
     bodyHealth: (j['bodyHealth'] ?? 0).toDouble(),
-    mLa: (j['m_la'] ?? 0).toDouble(), mRa: (j['m_ra'] ?? 0).toDouble(),
-    mLl: (j['m_ll'] ?? 0).toDouble(), mRl: (j['m_rl'] ?? 0).toDouble(),
-    mTr: (j['m_tr'] ?? 0).toDouble(),
-    fLa: (j['f_la'] ?? 0).toDouble(), fRa: (j['f_ra'] ?? 0).toDouble(),
-    fLl: (j['f_ll'] ?? 0).toDouble(), fRl: (j['f_rl'] ?? 0).toDouble(),
-    fTr: (j['f_tr'] ?? 0).toDouble(),
   );
 }
 
@@ -82,6 +60,7 @@ class AppState extends ChangeNotifier {
   static final AppState instance = AppState._();
   AppState._();
 
+  // История по профилям: profileId -> список записей
   final Map<String, List<MeasurementRecord>> _history = {};
 
   String get _activeId =>
@@ -90,13 +69,21 @@ class AppState extends ChangeNotifier {
   List<MeasurementRecord> get records => _history[_activeId] ?? [];
   MeasurementRecord? get latest => records.isEmpty ? null : records.last;
 
+  // Последние полученные значения импеданса из логов
+  List<int> lastImpedanceValues = [];
+
+  // ← ДОБАВЛЕНО: Данные профиля для BIA (всего 1 поле!)
+  Map<String, dynamic>? lastProfileData;
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
+    // Загружаем историю для всех профилей
     for (final profile in ProfileManager.instance.profiles) {
       final raw = prefs.getString('history_${profile.id}') ?? '[]';
       try {
         final list = jsonDecode(raw) as List;
-        _history[profile.id] = list.map((e) => MeasurementRecord.fromJson(e)).toList();
+        _history[profile.id] =
+            list.map((e) => MeasurementRecord.fromJson(e)).toList();
       } catch (_) {
         _history[profile.id] = [];
       }
@@ -108,7 +95,8 @@ class AppState extends ChangeNotifier {
       try {
         final list = jsonDecode(oldRaw) as List;
         if (list.isNotEmpty && (_history[_activeId]?.isEmpty ?? true)) {
-          _history[_activeId] = list.map((e) => MeasurementRecord.fromJson(e)).toList();
+          _history[_activeId] =
+              list.map((e) => MeasurementRecord.fromJson(e)).toList();
           await _saveForProfile(_activeId);
         }
       } catch (_) {}
@@ -124,6 +112,35 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addMeasurement({
+    required double weight,
+    double bodyFat = 0,
+    double muscle = 0,
+    double water = 0,
+    double bmi = 0,
+    double bmr = 0,
+    double boneMass = 0,
+    double visceralFat = 0,
+    double protein = 0,
+    double bodyAge = 0,
+    double bodyHealth = 0,
+  }) {
+    addRecord(MeasurementRecord(
+      date: DateTime.now(),
+      weight: weight,
+      bodyFat: bodyFat,
+      muscle: muscle,
+      water: water,
+      bmi: bmi,
+      bmr: bmr,
+      boneMass: boneMass,
+      visceralFat: visceralFat,
+      protein: protein,
+      bodyAge: bodyAge,
+      bodyHealth: bodyHealth,
+    ));
+  }
+
   Future<void> _saveForProfile(String profileId) async {
     final prefs = await SharedPreferences.getInstance();
     final list = _history[profileId] ?? [];
@@ -133,12 +150,14 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  /// При переключении профиля — перезагрузить данные
   Future<void> onProfileSwitch() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('history_$_activeId') ?? '[]';
     try {
       final list = jsonDecode(raw) as List;
-      _history[_activeId] = list.map((e) => MeasurementRecord.fromJson(e)).toList();
+      _history[_activeId] =
+          list.map((e) => MeasurementRecord.fromJson(e)).toList();
     } catch (_) {
       _history[_activeId] = [];
     }
@@ -148,59 +167,38 @@ class AppState extends ChangeNotifier {
   List<double> valuesFor(String key) {
     return records.map((r) {
       switch (key) {
-        case 'weight':      return r.weight;
-        case 'bodyFat':     return r.bodyFat;
-        case 'muscle':      return r.muscle;
-        case 'water':       return r.water;
-        case 'bmi':         return r.bmi;
-        case 'bmr':         return r.bmr;
-        case 'boneMass':    return r.boneMass;
+        case 'weight': return r.weight;
+        case 'bodyFat': return r.bodyFat;
+        case 'muscle': return r.muscle;
+        case 'water': return r.water;
+        case 'bmi': return r.bmi;
+        case 'bmr': return r.bmr;
+        case 'boneMass': return r.boneMass;
         case 'visceralFat': return r.visceralFat;
-        case 'protein':     return r.protein;
-        case 'bodyAge':     return r.bodyAge;
-        case 'bodyHealth':  return r.bodyHealth;
-        case 'm_la':        return r.mLa;
-        case 'm_ra':        return r.mRa;
-        case 'm_ll':        return r.mLl;
-        case 'm_rl':        return r.mRl;
-        case 'm_tr':        return r.mTr;
-        case 'f_la':        return r.fLa;
-        case 'f_ra':        return r.fRa;
-        case 'f_ll':        return r.fLl;
-        case 'f_rl':        return r.fRl;
-        case 'f_tr':        return r.fTr;
-        default:            return 0.0;
+        case 'protein': return r.protein;
+        case 'bodyAge': return r.bodyAge;
+        case 'bodyHealth': return r.bodyHealth;
+        default: return 0.0;
       }
     }).toList();
   }
 
-  // Получить значение из latest по ключу
   double latestFor(String key) {
-    final l = latest;
-    if (l == null) return 0;
+    final r = latest;
+    if (r == null) return 0.0;
     switch (key) {
-      case 'weight':      return l.weight;
-      case 'bodyFat':     return l.bodyFat;
-      case 'muscle':      return l.muscle;
-      case 'water':       return l.water;
-      case 'bmi':         return l.bmi;
-      case 'bmr':         return l.bmr;
-      case 'boneMass':    return l.boneMass;
-      case 'visceralFat': return l.visceralFat;
-      case 'protein':     return l.protein;
-      case 'bodyAge':     return l.bodyAge;
-      case 'bodyHealth':  return l.bodyHealth;
-      case 'm_la':        return l.mLa;
-      case 'm_ra':        return l.mRa;
-      case 'm_ll':        return l.mLl;
-      case 'm_rl':        return l.mRl;
-      case 'm_tr':        return l.mTr;
-      case 'f_la':        return l.fLa;
-      case 'f_ra':        return l.fRa;
-      case 'f_ll':        return l.fLl;
-      case 'f_rl':        return l.fRl;
-      case 'f_tr':        return l.fTr;
-      default:            return 0;
+      case 'weight': return r.weight;
+      case 'bodyFat': return r.bodyFat;
+      case 'muscle': return r.muscle;
+      case 'water': return r.water;
+      case 'bmi': return r.bmi;
+      case 'bmr': return r.bmr;
+      case 'boneMass': return r.boneMass;
+      case 'visceralFat': return r.visceralFat;
+      case 'protein': return r.protein;
+      case 'bodyAge': return r.bodyAge;
+      case 'bodyHealth': return r.bodyHealth;
+      default: return 0.0;
     }
   }
 
@@ -216,6 +214,7 @@ class AppState extends ChangeNotifier {
     final curr = vals[vals.length - 1];
     if (prev == 0) return '';
     final diff = ((curr - prev) / prev * 100);
-    return '${diff >= 0 ? '↑' : '↓'}${diff.abs().toStringAsFixed(1)}%';
+    final sign = diff >= 0 ? '↑' : '↓';
+    return '$sign${diff.abs().toStringAsFixed(1)}%';
   }
 }
