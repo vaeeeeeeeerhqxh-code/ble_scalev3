@@ -17,6 +17,20 @@ class MeasurementRecord {
   final double bodyAge;
   final double bodyHealth;
 
+  // Segmental Muscle
+  final double mLa;
+  final double mRa;
+  final double mLl;
+  final double mRl;
+  final double mTr;
+
+  // Segmental Fat
+  final double fLa;
+  final double fRa;
+  final double fLl;
+  final double fRl;
+  final double fTr;
+
   MeasurementRecord({
     required this.date,
     required this.weight,
@@ -30,6 +44,16 @@ class MeasurementRecord {
     required this.protein,
     required this.bodyAge,
     required this.bodyHealth,
+    this.mLa = 0,
+    this.mRa = 0,
+    this.mLl = 0,
+    this.mRl = 0,
+    this.mTr = 0,
+    this.fLa = 0,
+    this.fRa = 0,
+    this.fLl = 0,
+    this.fRl = 0,
+    this.fTr = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -38,6 +62,8 @@ class MeasurementRecord {
     'water': water, 'bmi': bmi, 'bmr': bmr, 'boneMass': boneMass,
     'visceralFat': visceralFat, 'protein': protein,
     'bodyAge': bodyAge, 'bodyHealth': bodyHealth,
+    'mLa': mLa, 'mRa': mRa, 'mLl': mLl, 'mRl': mRl, 'mTr': mTr,
+    'fLa': fLa, 'fRa': fRa, 'fLl': fLl, 'fRl': fRl, 'fTr': fTr,
   };
 
   factory MeasurementRecord.fromJson(Map<String, dynamic> j) => MeasurementRecord(
@@ -53,6 +79,16 @@ class MeasurementRecord {
     protein: (j['protein'] ?? 0).toDouble(),
     bodyAge: (j['bodyAge'] ?? 0).toDouble(),
     bodyHealth: (j['bodyHealth'] ?? 0).toDouble(),
+    mLa: (j['mLa'] ?? 0).toDouble(),
+    mRa: (j['mRa'] ?? 0).toDouble(),
+    mLl: (j['mLl'] ?? 0).toDouble(),
+    mRl: (j['mRl'] ?? 0).toDouble(),
+    mTr: (j['mTr'] ?? 0).toDouble(),
+    fLa: (j['fLa'] ?? 0).toDouble(),
+    fRa: (j['fRa'] ?? 0).toDouble(),
+    fLl: (j['fLl'] ?? 0).toDouble(),
+    fRl: (j['fRl'] ?? 0).toDouble(),
+    fTr: (j['fTr'] ?? 0).toDouble(),
   );
 }
 
@@ -60,7 +96,6 @@ class AppState extends ChangeNotifier {
   static final AppState instance = AppState._();
   AppState._();
 
-  // История по профилям: profileId -> список записей
   final Map<String, List<MeasurementRecord>> _history = {};
 
   String get _activeId =>
@@ -69,15 +104,11 @@ class AppState extends ChangeNotifier {
   List<MeasurementRecord> get records => _history[_activeId] ?? [];
   MeasurementRecord? get latest => records.isEmpty ? null : records.last;
 
-  // Последние полученные значения импеданса из логов
   List<int> lastImpedanceValues = [];
-
-  // ← ДОБАВЛЕНО: Данные профиля для BIA (всего 1 поле!)
   Map<String, dynamic>? lastProfileData;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    // Загружаем историю для всех профилей
     for (final profile in ProfileManager.instance.profiles) {
       final raw = prefs.getString('history_${profile.id}') ?? '[]';
       try {
@@ -88,20 +119,6 @@ class AppState extends ChangeNotifier {
         _history[profile.id] = [];
       }
     }
-
-    // Миграция старой истории
-    final oldRaw = prefs.getString('measurement_history');
-    if (oldRaw != null && _activeId != 'default') {
-      try {
-        final list = jsonDecode(oldRaw) as List;
-        if (list.isNotEmpty && (_history[_activeId]?.isEmpty ?? true)) {
-          _history[_activeId] =
-              list.map((e) => MeasurementRecord.fromJson(e)).toList();
-          await _saveForProfile(_activeId);
-        }
-      } catch (_) {}
-    }
-
     notifyListeners();
   }
 
@@ -110,35 +127,6 @@ class AppState extends ChangeNotifier {
     _history[_activeId]!.add(record);
     await _saveForProfile(_activeId);
     notifyListeners();
-  }
-
-  void addMeasurement({
-    required double weight,
-    double bodyFat = 0,
-    double muscle = 0,
-    double water = 0,
-    double bmi = 0,
-    double bmr = 0,
-    double boneMass = 0,
-    double visceralFat = 0,
-    double protein = 0,
-    double bodyAge = 0,
-    double bodyHealth = 0,
-  }) {
-    addRecord(MeasurementRecord(
-      date: DateTime.now(),
-      weight: weight,
-      bodyFat: bodyFat,
-      muscle: muscle,
-      water: water,
-      bmi: bmi,
-      bmr: bmr,
-      boneMass: boneMass,
-      visceralFat: visceralFat,
-      protein: protein,
-      bodyAge: bodyAge,
-      bodyHealth: bodyHealth,
-    ));
   }
 
   Future<void> _saveForProfile(String profileId) async {
@@ -150,18 +138,8 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  /// При переключении профиля — перезагрузить данные
   Future<void> onProfileSwitch() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('history_$_activeId') ?? '[]';
-    try {
-      final list = jsonDecode(raw) as List;
-      _history[_activeId] =
-          list.map((e) => MeasurementRecord.fromJson(e)).toList();
-    } catch (_) {
-      _history[_activeId] = [];
-    }
-    notifyListeners();
+    await load();
   }
 
   List<double> valuesFor(String key) {
@@ -178,6 +156,11 @@ class AppState extends ChangeNotifier {
         case 'protein': return r.protein;
         case 'bodyAge': return r.bodyAge;
         case 'bodyHealth': return r.bodyHealth;
+        case 'm_la': return r.mLa;
+        case 'm_ra': return r.mRa;
+        case 'm_ll': return r.mLl;
+        case 'm_rl': return r.mRl;
+        case 'm_tr': return r.mTr;
         default: return 0.0;
       }
     }).toList();
@@ -198,6 +181,11 @@ class AppState extends ChangeNotifier {
       case 'protein': return r.protein;
       case 'bodyAge': return r.bodyAge;
       case 'bodyHealth': return r.bodyHealth;
+      case 'm_la': return r.mLa;
+      case 'm_ra': return r.mRa;
+      case 'm_ll': return r.mLl;
+      case 'm_rl': return r.mRl;
+      case 'm_tr': return r.mTr;
       default: return 0.0;
     }
   }
