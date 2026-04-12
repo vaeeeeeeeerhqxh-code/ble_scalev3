@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:ble_scale_app/core/body_analyzer.dart';
-import 'package:ble_scale_app/ui/theme.dart';
 import 'package:ble_scale_app/ui/widgets/analysis_grid.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -16,7 +15,7 @@ import 'package:ble_scale_app/app_state.dart';
 
 class DeviceIce extends StatefulWidget {
   final PPDeviceModel device;
-  const DeviceIce({Key? key, required this.device}) : super(key: key);
+  const DeviceIce({super.key, required this.device});
 
   @override
   State<DeviceIce> createState() => _DeviceIceState();
@@ -24,13 +23,13 @@ class DeviceIce extends StatefulWidget {
 
 class _DeviceIceState extends State<DeviceIce> {
   // --- Состояние измерений ---
-  dynamic _bodyData;
   PPDeviceConnectionState _connectionStatus = PPDeviceConnectionState.disconnected;
   double _weightValue = 0;
   String _measurementStateStr = 'Ожидание...';
   bool _isMeasuring = false;
   bool _showResults = false;
   Timer? _timer;
+  Map<String, dynamic> _analysisResult = {};
 
   // --- Единица измерения (сохраняется через SharedPreferences) ---
   PPUnitType _unit = PPUnitType.Unit_KG;
@@ -75,8 +74,7 @@ class _DeviceIceState extends State<DeviceIce> {
 
         // Включаем импеданс для анализа состава тела
         Future.delayed(const Duration(seconds: 2), () async {
-          final result = await PPPeripheralIce.impedanceSwitchControl(true);
-          print("IMPEDANCE ENABLE RESULT: $result");
+          await PPPeripheralIce.impedanceSwitchControl(true);
         });
       }
 
@@ -94,21 +92,23 @@ class _DeviceIceState extends State<DeviceIce> {
         if (mounted) {
           setState(() {
             _weightValue = dataModel.weight / 100.0;
-            _bodyData = dataModel;
 
             if (measurementState == PPMeasurementDataState.completed) {
               _measurementStateStr = 'Готово';
               _isMeasuring = false;
               _showResults = true;
-              // Сохраняем в историю
-              final json = dataModel.toJson();
+              
               final result = BodyAnalyzer.calculate(
                 weight: _weightValue,
-                height: _userProfile.userHeight.toDouble(),
-                age: _userProfile.age,
-                isMale: _userProfile.sex == PPUserGender.male,
-                data: json,
+                impedanceValues: AppState.instance.lastImpedanceValues,
+                profile: UserProfile(
+                  height: _userProfile.userHeight.toDouble(),
+                  age: _userProfile.age,
+                  isMale: _userProfile.sex == PPUserGender.male,
+                ),
               );
+
+              _analysisResult = result;
 
               if (result.isNotEmpty) {
                 AppState.instance.addRecord(MeasurementRecord(
@@ -129,11 +129,6 @@ class _DeviceIceState extends State<DeviceIce> {
                   mLl: (result['m_ll'] ?? 0).toDouble(),
                   mRl: (result['m_rl'] ?? 0).toDouble(),
                   mTr: (result['m_tr'] ?? 0).toDouble(),
-                  fLa: (result['f_la'] ?? 0).toDouble(),
-                  fRa: (result['f_ra'] ?? 0).toDouble(),
-                  fLl: (result['f_ll'] ?? 0).toDouble(),
-                  fRl: (result['f_rl'] ?? 0).toDouble(),
-                  fTr: (result['f_tr'] ?? 0).toDouble(),
                 ));
               }
             } else if (measurementState == PPMeasurementDataState.measuringBodyFat) {
@@ -176,10 +171,6 @@ class _DeviceIceState extends State<DeviceIce> {
   Future<void> _fetchHistory() async {
     if (_connectionStatus != PPDeviceConnectionState.connected) return;
     PPPeripheralIce.fetchHistoryData(callBack: (dataList, isSuccess) {
-      print('History count: ${dataList.length}, success: $isSuccess');
-      for (PPBodyBaseModel model in dataList) {
-        print('history weight:${model.weight}');
-      }
       if (isSuccess && dataList.isNotEmpty) {
         PPPeripheralIce.deleteHistoryData();
       }
@@ -194,7 +185,6 @@ class _DeviceIceState extends State<DeviceIce> {
         ssId: ssid,
         password: password,
       );
-      print('Wi-Fi config result: ${result.success}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -209,7 +199,6 @@ class _DeviceIceState extends State<DeviceIce> {
   Future<void> _wifiOTA() async {
     if (_connectionStatus != PPDeviceConnectionState.connected) return;
     final ret = await PPPeripheralIce.wifiOTA();
-    print('wifiOTA return: $ret');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('OTA: $ret')),
@@ -222,7 +211,7 @@ class _DeviceIceState extends State<DeviceIce> {
     final directory = await getApplicationDocumentsDirectory();
     final logDirectory = '${directory.path}/DeviceLog';
     PPPeripheralIce.syncDeviceLog(logDirectory, callBack: (progress, isFailed, filePath) {
-      print('sync log - isFailed:$isFailed filePath:$filePath');
+      // Sync log callback
     });
   }
 
@@ -294,17 +283,16 @@ class _DeviceIceState extends State<DeviceIce> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(vertical: 40),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [primary, accent]),
+        gradient: const LinearGradient(colors: [Color(0xFF4C6EF5), Color(0xFFCC5DE8)]),
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
-          BoxShadow(color: accent.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))
+          BoxShadow(color: const Color(0xFFCC5DE8).withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))
         ],
       ),
       child: Column(
         children: [
           Text(_measurementStateStr, style: const TextStyle(color: Colors.white70, fontSize: 16)),
           const SizedBox(height: 10),
-          // Анимация веса
           TweenAnimationBuilder(
             tween: Tween(begin: 0.0, end: _weightValue),
             duration: const Duration(milliseconds: 500),
@@ -401,14 +389,14 @@ class _DeviceIceState extends State<DeviceIce> {
         margin: const EdgeInsets.only(right: 12),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.white12),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: accent, size: 18),
+            Icon(icon, color: const Color(0xFFCC5DE8), size: 18),
             const SizedBox(height: 4),
             Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
           ],
@@ -419,22 +407,14 @@ class _DeviceIceState extends State<DeviceIce> {
 
   @override
   Widget build(BuildContext context) {
-    final json = _bodyData?.toJson() ?? {};
-
-    final result = BodyAnalyzer.calculate(
-      weight: _weightValue,
-      height: _userProfile.userHeight.toDouble(),
-      age: _userProfile.age,
-      isMale: _userProfile.sex == PPUserGender.male,
-      data: json,
-    );
-
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: const Color(0xFF0D1B3E),
       appBar: AppBar(
         title: Text(widget.device.deviceName ?? "Умные весы"),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
       ),
       body: Column(
         children: [
@@ -466,7 +446,7 @@ class _DeviceIceState extends State<DeviceIce> {
                   : _isMeasuring
                       ? _buildAnalysisLoading()
                       : _showResults
-                          ? AnalysisGrid(bodyData: result)
+                          ? AnalysisGrid(data: _analysisResult)
                           : const Center(
                               child: Text(
                                 "Ожидание завершения анализа...",
