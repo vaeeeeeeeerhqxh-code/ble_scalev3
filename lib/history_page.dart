@@ -135,7 +135,7 @@ class _HistoryPageState extends State<HistoryPage> {
               leading: Container(
                 width: 32, height: 32,
                 decoration: BoxDecoration(
-                  color: (m['color'] as Color).withOpacity(0.2),
+                  color: (m['color'] as Color).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(Icons.show_chart, color: m['color'] as Color, size: 18),
@@ -182,7 +182,6 @@ class _HistoryPageState extends State<HistoryPage> {
               final records = _records;
               final values = _values;
               final hasData = values.isNotEmpty && values.any((v) => v > 0);
-              final latest = records.isNotEmpty ? records.last : null;
 
               return CustomScrollView(
                 slivers: [
@@ -208,7 +207,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                   ),
 
-                  SliverToBoxAdapter(child: const SizedBox(height: 16)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
                   // Основная карточка с графиком
                   SliverToBoxAdapter(
@@ -277,12 +276,12 @@ class _HistoryPageState extends State<HistoryPage> {
                               Row(
                                 children: [
                                   _highLowBox(
-                                    '${_fmt(_maxVal)} ${_selectedMetricUnit}',
+                                    '${_fmt(_maxVal)} $_selectedMetricUnit',
                                     'Высокий: $_selectedMetricLabel',
                                   ),
                                   const SizedBox(width: 32),
                                   _highLowBox(
-                                    '${_fmt(_minVal)} ${_selectedMetricUnit}',
+                                    '${_fmt(_minVal)} $_selectedMetricUnit',
                                     'Низкий: $_selectedMetricLabel',
                                   ),
                                 ],
@@ -303,9 +302,9 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                   ),
 
-                  SliverToBoxAdapter(child: const SizedBox(height: 20)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-                  // Карточки других показателей (как в референсе)
+                  // Карточки других показателей
                   if (AppState.instance.latest != null)
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -340,7 +339,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: isSelected
-                                        ? color.withOpacity(0.6)
+                                        ? color.withValues(alpha: 0.6)
                                         : Colors.transparent,
                                     width: 1.5,
                                   ),
@@ -353,7 +352,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                         Container(
                                           width: 28, height: 28,
                                           decoration: BoxDecoration(
-                                            color: color.withOpacity(0.2),
+                                            color: color.withValues(alpha: 0.2),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Center(
@@ -410,7 +409,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       ),
                     ),
 
-                  SliverToBoxAdapter(child: const SizedBox(height: 20)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
                   // Список всех записей
                   if (records.isNotEmpty) ...[
@@ -449,7 +448,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: isFirst
-                                      ? _selectedMetricColor.withOpacity(0.4)
+                                      ? _selectedMetricColor.withValues(alpha: 0.4)
                                       : Colors.transparent,
                                 ),
                               ),
@@ -486,7 +485,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   ] else
                     SliverToBoxAdapter(child: _buildEmptyState()),
 
-                  SliverToBoxAdapter(child: const SizedBox(height: 32)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 ],
               );
             },
@@ -553,7 +552,7 @@ class _HistoryPageState extends State<HistoryPage> {
           show: true,
           drawVerticalLine: false,
           getDrawingHorizontalLine: (_) => FlLine(
-              color: Colors.white.withOpacity(0.05), strokeWidth: 1),
+              color: Colors.white.withValues(alpha: 0.05), strokeWidth: 1),
         ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
@@ -605,14 +604,8 @@ class _HistoryPageState extends State<HistoryPage> {
             curveSmoothness: 0.3,
             color: _selectedMetricColor,
             barWidth: 2,
-            dotData: FlDotData(
+            dotData: const FlDotData(
               show: true,
-              getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
-                radius: 3,
-                color: _selectedMetricColor,
-                strokeWidth: 1.5,
-                strokeColor: Colors.white,
-              ),
             ),
             belowBarData: BarAreaData(
               show: true,
@@ -620,8 +613,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  _selectedMetricColor.withOpacity(0.25),
-                  _selectedMetricColor.withOpacity(0.0),
+                  _selectedMetricColor.withValues(alpha: 0.25),
+                  _selectedMetricColor.withValues(alpha: 0.0),
                 ],
               ),
             ),
@@ -636,7 +629,7 @@ class _HistoryPageState extends State<HistoryPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.bar_chart, size: 40, color: Colors.white.withOpacity(0.1)),
+          Icon(Icons.bar_chart, size: 40, color: Colors.white.withValues(alpha: 0.1)),
           const SizedBox(height: 8),
           const Text('Нет данных',
               style: TextStyle(color: Colors.white24, fontSize: 13)),
@@ -654,12 +647,12 @@ class _HistoryPageState extends State<HistoryPage> {
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFF4C6EF5).withOpacity(0.1),
+                color: const Color(0xFF4C6EF5).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.bar_chart,
                   size: 32,
-                  color: const Color(0xFF4C6EF5).withOpacity(0.4)),
+                  color: const Color(0xFF4C6EF5).withValues(alpha: 0.4)),
             ),
             const SizedBox(height: 16),
             const Text('Нет записей',
