@@ -113,7 +113,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
                     if (!isActive) {
                       await ProfileManager.instance.switchProfile(p.id);
                       await AppState.instance.onProfileSwitch();
-                      setState(() {});
+                      if (mounted) setState(() {});
                     }
                   },
                 );
@@ -152,7 +152,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
       ],
     );
 
-    if (result == null) return;
+    if (result == null || !mounted) return;
     switch (result) {
       case 'add_device':
         Navigator.push(context, MaterialPageRoute(builder: (_) => const BleScanPage()));
@@ -184,22 +184,6 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
           ),
         ],
       ),
-    );
-  }
-
-  Widget _menuItem(IconData icon, String label, VoidCallback onTap) {
-    return ListTile(
-      leading: Container(
-        width: 40, height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFF4C6EF5).withOpacity(0.15),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: const Color(0xFF4C6EF5), size: 20),
-      ),
-      title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
-      trailing: const Icon(Icons.chevron_right, color: Colors.white24),
-      onTap: onTap,
     );
   }
 
@@ -393,7 +377,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         decoration: BoxDecoration(
           color: const Color(0xFF1A2340),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,7 +419,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               SizedBox(height: 32, child: _miniChart(values, color))
             else
               SizedBox(height: 32,
-                  child: Center(child: Text('Нет данных',
+                  child: const Center(child: Text('Нет данных',
                       style: TextStyle(color: Colors.white12, fontSize: 9)))),
           ],
         ),
@@ -515,10 +499,10 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Цель', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                Row(children: [
-                  const Text('-- кг', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.edit_outlined, color: Colors.white38, size: 16),
+                const Row(children: [
+                  Text('-- кг', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                  SizedBox(width: 4),
+                  Icon(Icons.edit_outlined, color: Colors.white38, size: 16),
                 ]),
               ],
             ),
@@ -553,8 +537,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
         child: Row(children: [
           Icon(icon, color: Colors.white54, size: 20),
           const SizedBox(width: 12),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w500)),
-          const Spacer(),
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w500))),
           const Icon(Icons.chevron_right, color: Colors.white24, size: 20),
         ]),
       ),
@@ -585,7 +568,7 @@ class _ScanPageState extends State<ScanPage> with SingleTickerProviderStateMixin
             show: true,
             gradient: LinearGradient(
               begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              colors: [color.withOpacity(0.3), color.withOpacity(0.0)],
+              colors: [color.withValues(alpha: 0.3), color.withValues(alpha: 0.0)],
             ),
           ),
         ),
