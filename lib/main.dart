@@ -7,6 +7,9 @@ import 'onboarding_screen.dart';
 import 'profile_manager.dart';
 import 'app_state.dart';
 
+// Глобальный notifier для темы
+final themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -31,10 +34,7 @@ Future<void> main() async {
     print("Error loading device settings: $e");
   }
 
-  // Загружаем профили
   await ProfileManager.instance.load();
-
-  // Загружаем историю измерений
   await AppState.instance.load();
 
   final hasProfiles = ProfileManager.instance.hasProfiles;
@@ -48,14 +48,36 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'BLE Scale App',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
-      home: onboardingDone ? const MainScreen() : const OnboardingScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          title: 'BLE Scale App',
+          debugShowCheckedModeBanner: false,
+          themeMode: mode,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primarySwatch: Colors.blue,
+            useMaterial3: true,
+            scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF4C6EF5),
+              brightness: Brightness.light,
+            ),
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primarySwatch: Colors.blue,
+            useMaterial3: true,
+            scaffoldBackgroundColor: const Color(0xFF0D1B3E),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF4C6EF5),
+              brightness: Brightness.dark,
+            ),
+          ),
+          home: onboardingDone ? const MainScreen() : const OnboardingScreen(),
+        );
+      },
     );
   }
 }
